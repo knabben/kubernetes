@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// MetricIdentifier represents the metric identifier for some object.
 type MetricIdentifier struct {
 	// name is the name of the given metric
 	Name string
@@ -34,7 +35,7 @@ type MetricIdentifier struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// a list of values for a given metric for some set of objects
+// MetricValueList represents the list of values for a given metric for some set of objects.
 type MetricValueList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -45,7 +46,7 @@ type MetricValueList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// a metric value for some object
+// MetricValue represents the metric value for some object.
 type MetricValue struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -73,7 +74,7 @@ const AllObjects = "*"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MetricListOptions is used to select metrics by their label selectors
+// MetricListOptions is used to select metrics by their label selectors.
 type MetricListOptions struct {
 	metav1.TypeMeta `json:",inline"`
 

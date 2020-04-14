@@ -27,30 +27,36 @@ import (
 	cmclient "k8s.io/metrics/pkg/client/custom_metrics"
 )
 
+// GetForActionImpl
 type GetForActionImpl struct {
 	testing.GetAction
 	MetricName    string
 	LabelSelector labels.Selector
 }
 
+// GetForAction
 type GetForAction interface {
 	testing.GetAction
 	GetMetricName() string
 	GetLabelSelector() labels.Selector
 }
 
+// GetMetricName
 func (i GetForActionImpl) GetMetricName() string {
 	return i.MetricName
 }
 
+// GetLabelSelector
 func (i GetForActionImpl) GetLabelSelector() labels.Selector {
 	return i.LabelSelector
 }
 
+// GetSubresource
 func (i GetForActionImpl) GetSubresource() string {
 	return i.MetricName
 }
 
+// DeepCopy
 func (i GetForActionImpl) DeepCopy() testing.Action {
 	var labelSelector labels.Selector
 	if i.LabelSelector != nil {
@@ -63,6 +69,7 @@ func (i GetForActionImpl) DeepCopy() testing.Action {
 	}
 }
 
+// NewGetForAction
 func NewGetForAction(groupKind schema.GroupKind, namespace, name string, metricName string, labelSelector labels.Selector) GetForActionImpl {
 	// the version doesn't matter
 	gvk := groupKind.WithVersion("")
@@ -82,6 +89,7 @@ func NewGetForAction(groupKind schema.GroupKind, namespace, name string, metricN
 	}
 }
 
+// NewRootGetForAction
 func NewRootGetForAction(groupKind schema.GroupKind, name string, metricName string, labelSelector labels.Selector) GetForActionImpl {
 	// the version doesn't matter
 	gvk := groupKind.WithVersion("")
@@ -101,16 +109,19 @@ func NewRootGetForAction(groupKind schema.GroupKind, name string, metricName str
 	}
 }
 
+// FakeCustomMetricsClient
 type FakeCustomMetricsClient struct {
 	testing.Fake
 }
 
+// RootScopedMetrics
 func (c *FakeCustomMetricsClient) RootScopedMetrics() cmclient.MetricsInterface {
 	return &fakeRootScopedMetrics{
 		Fake: c,
 	}
 }
 
+// NamespacedMetrics
 func (c *FakeCustomMetricsClient) NamespacedMetrics(namespace string) cmclient.MetricsInterface {
 	return &fakeNamespacedMetrics{
 		Fake: c,

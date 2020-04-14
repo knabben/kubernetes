@@ -25,10 +25,12 @@ import (
 	eclient "k8s.io/metrics/pkg/client/external_metrics"
 )
 
+// FakeExternalMetricsClient
 type FakeExternalMetricsClient struct {
 	testing.Fake
 }
 
+// NamespacedMetrics
 func (c *FakeExternalMetricsClient) NamespacedMetrics(namespace string) eclient.MetricsInterface {
 	return &fakeNamespacedMetrics{
 		Fake: c,

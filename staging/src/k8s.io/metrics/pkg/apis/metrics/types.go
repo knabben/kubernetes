@@ -27,7 +27,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a node.
+// NodeMetrics represents the resource usage metrics of a node.
 type NodeMetrics struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
@@ -43,7 +43,7 @@ type NodeMetrics struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeMetricsList is a list of NodeMetrics.
+// NodeMetricsList represents a list of NodeMetrics.
 type NodeMetricsList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
@@ -59,7 +59,7 @@ type NodeMetricsList struct {
 // +genclient:readonly
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a pod.
+// PodMetrics represents the resource usage metrics of a pod.
 type PodMetrics struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
@@ -75,7 +75,7 @@ type PodMetrics struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodMetricsList is a list of PodMetrics.
+// PodMetricsList represents a list of PodMetrics.
 type PodMetricsList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
@@ -86,7 +86,7 @@ type PodMetricsList struct {
 	Items []PodMetrics
 }
 
-// resource usage metrics of a container.
+// ContainerMetrics represents the resource usage metrics of a container.
 type ContainerMetrics struct {
 	// Container name corresponding to the one from pod.spec.containers.
 	Name string

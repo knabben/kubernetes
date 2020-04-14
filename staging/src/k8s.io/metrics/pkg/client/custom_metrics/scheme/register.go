@@ -26,12 +26,17 @@ import (
 	cmv1beta2 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 )
 
+// GroupName
 const GroupName = cmv1beta1.GroupName
 
+// SchemeGroupVersion
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
+// Scheme
 var Scheme = runtime.NewScheme()
+// Codecs
 var Codecs = serializer.NewCodecFactory(Scheme)
+// ParameterCodec
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 
 func init() {
