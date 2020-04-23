@@ -29,10 +29,12 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+// FlagExposer provides an interface for exposing a flag.
 type FlagExposer interface {
 	ExposeFlags(cmd *cobra.Command, flags ...string) FlagExposer
 }
 
+// ActsAsRootCommand set default functions and define the Command as root.
 func ActsAsRootCommand(cmd *cobra.Command, filters []string, groups ...CommandGroup) FlagExposer {
 	if cmd == nil {
 		panic("nil root command")
@@ -51,6 +53,7 @@ func ActsAsRootCommand(cmd *cobra.Command, filters []string, groups ...CommandGr
 	return templater
 }
 
+// UseOptionsTemplates set default functions templates for a Command.
 func UseOptionsTemplates(cmd *cobra.Command) {
 	templater := &templater{
 		UsageTemplate: OptionsUsageTemplate(),
@@ -73,9 +76,9 @@ func (templater *templater) FlagErrorFunc(exposedFlags ...string) func(*cobra.Co
 		c.SilenceUsage = true
 		switch c.CalledAs() {
 		case "options":
-			return fmt.Errorf("%s\nRun '%s' without flags.", err, c.CommandPath())
+			return fmt.Errorf("%s\nRun '%s' without flags", err, c.CommandPath())
 		default:
-			return fmt.Errorf("%s\nSee '%s --help' for usage.", err, c.CommandPath())
+			return fmt.Errorf("%s\nSee '%s --help' for usage", err, c.CommandPath())
 		}
 	}
 }
@@ -154,9 +157,9 @@ func (templater *templater) cmdGroups(c *cobra.Command, all []*cobra.Command) []
 	}
 }
 
-func (t *templater) cmdGroupsString(c *cobra.Command) string {
+func (templater *templater) cmdGroupsString(c *cobra.Command) string {
 	groups := []string{}
-	for _, cmdGroup := range t.cmdGroups(c, c.Commands()) {
+	for _, cmdGroup := range templater.cmdGroups(c, c.Commands()) {
 		cmds := []string{cmdGroup.Message}
 		for _, cmd := range cmdGroup.Commands {
 			if cmd.IsAvailableCommand() {
@@ -168,38 +171,38 @@ func (t *templater) cmdGroupsString(c *cobra.Command) string {
 	return strings.Join(groups, "\n\n")
 }
 
-func (t *templater) rootCmdName(c *cobra.Command) string {
-	return t.rootCmd(c).CommandPath()
+func (templater *templater) rootCmdName(c *cobra.Command) string {
+	return templater.rootCmd(c).CommandPath()
 }
 
-func (t *templater) isRootCmd(c *cobra.Command) bool {
-	return t.rootCmd(c) == c
+func (templater *templater) isRootCmd(c *cobra.Command) bool {
+	return templater.rootCmd(c) == c
 }
 
-func (t *templater) parents(c *cobra.Command) []*cobra.Command {
+func (templater *templater) parents(c *cobra.Command) []*cobra.Command {
 	parents := []*cobra.Command{c}
-	for current := c; !t.isRootCmd(current) && current.HasParent(); {
+	for current := c; !templater.isRootCmd(current) && current.HasParent(); {
 		current = current.Parent()
 		parents = append(parents, current)
 	}
 	return parents
 }
 
-func (t *templater) rootCmd(c *cobra.Command) *cobra.Command {
+func (templater *templater) rootCmd(c *cobra.Command) *cobra.Command {
 	if c != nil && !c.HasParent() {
 		return c
 	}
-	if t.RootCmd == nil {
+	if templater.RootCmd == nil {
 		panic("nil root cmd")
 	}
-	return t.RootCmd
+	return templater.RootCmd
 }
 
-func (t *templater) optionsCmdFor(c *cobra.Command) string {
+func (templater *templater) optionsCmdFor(c *cobra.Command) string {
 	if !c.Runnable() {
 		return ""
 	}
-	rootCmdStructure := t.parents(c)
+	rootCmdStructure := templater.parents(c)
 	for i := len(rootCmdStructure) - 1; i >= 0; i-- {
 		cmd := rootCmdStructure[i]
 		if _, _, err := cmd.Find([]string{"options"}); err == nil {
@@ -209,7 +212,7 @@ func (t *templater) optionsCmdFor(c *cobra.Command) string {
 	return ""
 }
 
-func (t *templater) usageLine(c *cobra.Command) string {
+func (templater *templater) usageLine(c *cobra.Command) string {
 	usage := c.UseLine()
 	suffix := "[options]"
 	if c.HasFlags() && !strings.Contains(usage, suffix) {

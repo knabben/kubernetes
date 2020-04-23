@@ -20,19 +20,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// CommandGroup holds a list of Commands
 type CommandGroup struct {
 	Message  string
 	Commands []*cobra.Command
 }
 
+// CommandGroups defines a list of CommandGroup
 type CommandGroups []CommandGroup
 
+// Add adds a Command in a CommandGroup list
 func (g CommandGroups) Add(c *cobra.Command) {
 	for _, group := range g {
 		c.AddCommand(group.Commands...)
 	}
 }
 
+// Has returns whether the Command exists within a CommandGroup
 func (g CommandGroups) Has(c *cobra.Command) bool {
 	for _, group := range g {
 		for _, command := range group.Commands {
@@ -44,6 +48,7 @@ func (g CommandGroups) Has(c *cobra.Command) bool {
 	return false
 }
 
+// AddAdditionalCommands inserts a list of Commands in a CommandGroup
 func AddAdditionalCommands(g CommandGroups, message string, cmds []*cobra.Command) CommandGroups {
 	group := CommandGroup{Message: message}
 	for _, c := range cmds {
