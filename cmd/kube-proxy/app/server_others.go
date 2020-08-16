@@ -73,11 +73,12 @@ var timeoutForNodePodCIDR = 5 * time.Minute
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.instanceConfig, o.CleanupAndExit, o.master)
 }
 
 func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
+	instanceConfig *proxyconfigapi.KubeProxyInstanceConfiguration,
 	cleanupAndExit bool,
 	master string) (*ProxyServer, error) {
 
@@ -91,7 +92,7 @@ func newProxyServer(
 		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	hostname, err := utilnode.GetHostname(instanceConfig.HostnameOverride)
 	if err != nil {
 		return nil, err
 	}

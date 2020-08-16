@@ -51,10 +51,10 @@ import (
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.instanceConfig, o.CleanupAndExit, o.master)
 }
 
-func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
+func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, instanceConfig *proxyconfigapi.KubeProxyInstanceConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -80,7 +80,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}
 
 	// Create event recorder
-	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	hostname, err := utilnode.GetHostname(config.instanceConfig.HostnameOverride)
 	if err != nil {
 		return nil, err
 	}

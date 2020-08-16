@@ -136,3 +136,9 @@ func getDefaultAddresses(bindAddress string) (defaultHealthzAddress, defaultMetr
 	}
 	return "[::]", "[::1]"
 }
+
+func SetDefaults_KubeProxyInstanceConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyInstanceConfiguration) {
+	if len(obj.BindAddress) == 0 {
+		obj.BindAddress = "0.0.0.0"
+	}
+}

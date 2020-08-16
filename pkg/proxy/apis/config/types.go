@@ -129,8 +129,6 @@ type KubeProxyConfiguration struct {
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
 	ClusterCIDR string
-	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
-	HostnameOverride string
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
 	ClientConnection componentbaseconfig.ClientConnectionConfiguration
@@ -168,6 +166,20 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// KubeProxyInstanceConfiguration contains everything necessary to configure the
+// Kubernetes proxy server.
+type KubeProxyInstanceConfiguration struct {
+	metav1.TypeMeta
+
+	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
+	// for all interfaces)
+	BindAddress string
+	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
+	HostnameOverride string
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'

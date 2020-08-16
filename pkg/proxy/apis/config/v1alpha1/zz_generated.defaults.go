@@ -32,9 +32,16 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1alpha1.KubeProxyConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeProxyConfiguration(obj.(*v1alpha1.KubeProxyConfiguration))
 	})
+	scheme.AddTypeDefaultingFunc(&v1alpha1.KubeProxyInstanceConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_KubeProxyInstanceConfiguration(obj.(*v1alpha1.KubeProxyInstanceConfiguration))
+	})
 	return nil
 }
 
 func SetObjectDefaults_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration) {
 	SetDefaults_KubeProxyConfiguration(in)
+}
+
+func SetObjectDefaults_KubeProxyInstanceConfiguration(in *v1alpha1.KubeProxyInstanceConfiguration) {
+	SetDefaults_KubeProxyInstanceConfiguration(in)
 }
