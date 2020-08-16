@@ -22,9 +22,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"net/http"
 	"os"
 	goruntime "runtime"
+	"sigs.k8s.io/yaml"
 	"strings"
 	"time"
 
@@ -38,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -228,18 +231,69 @@ func NewOptions() *Options {
 	}
 }
 
+// loadInstanceConfig decodes a serialized KubeProxyConfiguration to the internal type.
+func (o *Options) loadInstanceConfig(data []byte) (*kubeproxyconfig.KubeProxyInstanceConfiguration, error) {
+	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	if err != nil {
+		// Try strict decoding first. If that fails decode with a lenient
+		// decoder, which has only v1alpha1 registered, and log a warning.
+		// The lenient path is to be dropped when support for v1alpha1 is dropped.
+		if !runtime.IsStrictDecodingError(err) {
+			return nil, gerrors.Wrap(err, "failed to decode")
+		}
+
+		_, lenientCodecs, lenientErr := newLenientSchemeAndCodecs()
+		if lenientErr != nil {
+			return nil, lenientErr
+		}
+
+		configObj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
+		if lenientErr != nil {
+			// Lenient decoding failed with the current version, return the
+			// original strict error.
+			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+		}
+
+		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
+		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
+	}
+
+	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyInstanceConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
+	}
+	return proxyConfig, nil
+}
+
+
+// loadInstanceConfigFromFile File loads the contents of file and decodes it as a
+// KubeProxyConfiguration object.
+func (o *Options) loadInstanceConfigFromFile(file string, fields *map[string]interface{}) (*kubeproxyconfig.KubeProxyInstanceConfiguration, error) {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	err = yaml.Unmarshal(data, &fields)
+	if err != nil {
+		return nil, err
+	}
+
+	return o.loadInstanceConfig(data)
+}
+
 // Complete completes all the required options.
 func (o *Options) Complete() error {
+
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
 		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
 
-
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
-	if len(o.ConfigFile) > 0 {
-		c, err := o.loadConfigFromFile(o.ConfigFile)
+	if len(o.ConfigFile) > 0 || len(o.InstanceConfigFile) > 0{
+		c, err := o.loadConfigFromFile(o.ConfigFile, o.InstanceConfigFile)
 		if err != nil {
 			return err
 		}
@@ -254,6 +308,9 @@ func (o *Options) Complete() error {
 	if err := o.processHostnameOverrideFlag(); err != nil {
 		return err
 	}
+
+	klog.Info("Instance - ", o.instanceConfig.BindAddress)
+	klog.Info("Shared - ", o.config.BindAddress)
 
 	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
 }
@@ -410,47 +467,97 @@ func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, err
 
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
-func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfigFromFile(file, instanceFile string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	return o.loadConfig(data)
+	instanceData := []byte{}
+	if len(instanceFile) > 0 {
+		instanceData, err = ioutil.ReadFile(instanceFile);
+		if err != nil {
+			return nil, err
+		}
+
+		// do the merge.
+		mergeConfig := options.NewMergeConfiguration(data, instanceData)
+		data, err = mergeConfig.PatchShared()
+		if err != nil {
+			return nil, err
+		}
+		o.instanceConfig, err = o.loadKubeInstanceProxyConfig(instanceData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	proxyConfig, err := o.loadKubeProxyConfig(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// todo: we need to track if the field exists in the instance type or the default value was used.
+	// they can have the same value, but the use is true only if specified in the configuration file.
+	if len(instanceFile) == 0 {
+		o.instanceConfig.BindAddress = proxyConfig.BindAddress
+	}
+
+	return proxyConfig, nil
+}
+
+func (o *Options) loadKubeProxyConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
+	configObj, gvk, err := o.loadConfig(data)
+	if err != nil {
+		return nil, err
+	}
+	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
+	}
+	return proxyConfig, nil
+}
+
+func (o *Options) loadKubeInstanceProxyConfig(data []byte) (*kubeproxyconfig.KubeProxyInstanceConfiguration, error) {
+	configObj, gvk, err := o.loadConfig(data)
+	if err != nil {
+		return nil, err
+	}
+	config, ok := configObj.(*kubeproxyconfig.KubeProxyInstanceConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
+	}
+	return config, nil
 }
 
 // loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
-func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfig(data []byte) (runtime.Object, *schema.GroupVersionKind, error) {
 	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		// Try strict decoding first. If that fails decode with a lenient
 		// decoder, which has only v1alpha1 registered, and log a warning.
 		// The lenient path is to be dropped when support for v1alpha1 is dropped.
 		if !runtime.IsStrictDecodingError(err) {
-			return nil, gerrors.Wrap(err, "failed to decode")
+			return nil, nil, gerrors.Wrap(err, "failed to decode")
 		}
 
 		_, lenientCodecs, lenientErr := newLenientSchemeAndCodecs()
 		if lenientErr != nil {
-			return nil, lenientErr
+			return nil, nil, lenientErr
 		}
 
 		configObj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
 		if lenientErr != nil {
 			// Lenient decoding failed with the current version, return the
 			// original strict error.
-			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+			return nil, nil, fmt.Errorf("failed lenient decoding: %v", err)
 		}
 
 		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
 		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
 	}
 
-	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
-	if !ok {
-		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
-	}
-	return proxyConfig, nil
+	return configObj, gvk, nil
 }
 
 // ApplyDefaults applies the default values to Options.

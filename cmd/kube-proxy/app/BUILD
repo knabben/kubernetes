@@ -18,6 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     deps = [
+        "//cmd/kube-proxy/app/options:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
@@ -76,6 +77,7 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:aix": [
             "//pkg/proxy/metrics:go_default_library",
@@ -400,6 +402,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kube-proxy/app/options:all-srcs",
+    ],
     tags = ["automanaged"],
 )
