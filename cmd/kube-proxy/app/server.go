@@ -33,7 +33,7 @@ import (
 	"github.com/spf13/pflag"
 
 	gerrors "github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -104,6 +104,8 @@ type proxyRun interface {
 type Options struct {
 	// ConfigFile is the location of the proxy server's configuration file.
 	ConfigFile string
+	// ConfigFile is the location of the proxy server's configuration file.
+	InstanceConfigFile string
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
 	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
@@ -115,6 +117,8 @@ type Options struct {
 	WindowsService bool
 	// config is the proxy server's configuration object.
 	config *kubeproxyconfig.KubeProxyConfiguration
+	// instanceConfig is the proxy server's configuration object.
+	instanceConfig *kubeproxyconfig.KubeProxyInstanceConfiguration
 	// watcher is used to watch on the update change of ConfigFile
 	watcher filesystem.FSWatcher
 	// proxyServer is the interface to run the proxy server
@@ -143,12 +147,17 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.addOSFlags(fs)
 
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
+	fs.StringVar(&o.InstanceConfigFile, "instance-config", o.InstanceConfigFile, "The path to the configuration file.")
+
+	// InstanceConfiguration only fields
+	//fs.Var(utilflag.IPVar{Val: &o.instanceConfig.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
+	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
+
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
 	fs.StringVar(&o.config.ClientConnection.ContentType, "kube-api-content-type", o.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
 	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&o.config.IPVS.Scheduler, "ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
 	fs.StringVar(&o.config.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.config.ShowHiddenMetricsForVersion,
 		"The previous version for which you want to show hidden metrics. "+
@@ -164,8 +173,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 	fs.BoolVar(&o.CleanupIPVS, "cleanup-ipvs", o.CleanupIPVS, "If true and --cleanup is specified, kube-proxy will also flush IPVS rules, in addition to normal cleanup.")
 	fs.MarkDeprecated("cleanup-ipvs", "In a future release, running --cleanup will always flush IPVS rules")
-
-	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address with port for the health check server to serve on (set to '0.0.0.0:10256' for all IPv4 interfaces and '[::]:10256' for all IPv6 interfaces). Set empty to disable.")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address with port for the metrics server to serve on (set to '0.0.0.0:10249' for all IPv4 interfaces and '[::]:10249' for all IPv6 interfaces). Set empty to disable.")
 	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
@@ -212,11 +219,12 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 // NewOptions returns initialized Options
 func NewOptions() *Options {
 	return &Options{
-		config:      new(kubeproxyconfig.KubeProxyConfiguration),
-		healthzPort: ports.ProxyHealthzPort,
-		metricsPort: ports.ProxyStatusPort,
-		CleanupIPVS: true,
-		errCh:       make(chan error),
+		config:         new(kubeproxyconfig.KubeProxyConfiguration),
+		instanceConfig: new(kubeproxyconfig.KubeProxyInstanceConfiguration),
+		healthzPort:    ports.ProxyHealthzPort,
+		metricsPort:    ports.ProxyStatusPort,
+		CleanupIPVS:    true,
+		errCh:          make(chan error),
 	}
 }
 
@@ -228,12 +236,14 @@ func (o *Options) Complete() error {
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
 
+
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
 		c, err := o.loadConfigFromFile(o.ConfigFile)
 		if err != nil {
 			return err
 		}
+
 		o.config = c
 
 		if err := o.initWatcher(); err != nil {
@@ -287,7 +297,7 @@ func (o *Options) processHostnameOverrideFlag() error {
 		if len(hostName) == 0 {
 			return fmt.Errorf("empty hostname-override is invalid")
 		}
-		o.config.HostnameOverride = strings.ToLower(hostName)
+		o.instanceConfig.HostnameOverride = strings.ToLower(hostName)
 	}
 
 	return nil
@@ -411,7 +421,6 @@ func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyCon
 
 // loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
 func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-
 	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		// Try strict decoding first. If that fails decode with a lenient
@@ -452,7 +461,6 @@ func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*ku
 	}
 
 	proxyconfigscheme.Scheme.Default(external)
-
 	internal, err := proxyconfigscheme.Scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
