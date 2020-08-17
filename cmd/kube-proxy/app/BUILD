@@ -18,6 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     deps = [
+        "//cmd/kube-proxy/app/options:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
@@ -400,6 +401,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kube-proxy/app/options:all-srcs",
+    ],
     tags = ["automanaged"],
 )

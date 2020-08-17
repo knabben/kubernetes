@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"net/http"
 	"os"
 	goruntime "runtime"
@@ -230,16 +231,34 @@ func NewOptions() *Options {
 
 // Complete completes all the required options.
 func (o *Options) Complete() error {
+	var instanceData []byte
+
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
 		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
 
+	// Set instance configuration file and save content
+	if len(o.InstanceConfigFile) > 0 {
+		var err error
+
+		instanceData, err = ioutil.ReadFile(o.InstanceConfigFile)
+		if err != nil {
+			return err
+		}
+
+		ci, err := o.loadInstanceConfig(instanceData)
+		if err != nil {
+			return err
+		}
+
+		o.instanceConfig = ci
+	}
 
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
-		c, err := o.loadConfigFromFile(o.ConfigFile)
+		c, err := o.loadConfigFromFile(o.ConfigFile, instanceData)
 		if err != nil {
 			return err
 		}
@@ -255,7 +274,45 @@ func (o *Options) Complete() error {
 		return err
 	}
 
+	klog.Info(o.instanceConfig.BindAddress)
+	klog.Info(o.config.BindAddress)
+
 	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
+}
+
+
+// loadInstanceConfig decodes a serialized KubeProxyConfiguration to the internal type.
+func (o *Options) loadInstanceConfig(data []byte) (*kubeproxyconfig.KubeProxyInstanceConfiguration, error) {
+	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	if err != nil {
+		// Try strict decoding first. If that fails decode with a lenient
+		// decoder, which has only v1alpha1 registered, and log a warning.
+		// The lenient path is to be dropped when support for v1alpha1 is dropped.
+		if !runtime.IsStrictDecodingError(err) {
+			return nil, gerrors.Wrap(err, "failed to decode")
+		}
+
+		_, lenientCodecs, lenientErr := newLenientSchemeAndCodecs()
+		if lenientErr != nil {
+			return nil, lenientErr
+		}
+
+		configObj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
+		if lenientErr != nil {
+			// Lenient decoding failed with the current version, return the
+			// original strict error.
+			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+		}
+
+		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
+		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
+	}
+
+	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyInstanceConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
+	}
+	return proxyConfig, nil
 }
 
 // Creates a new filesystem watcher and adds watches for the config file.
@@ -408,15 +465,37 @@ func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, err
 	return lenientScheme, &lenientCodecs, nil
 }
 
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
-func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfigFromFile(file string, instanceData []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	return o.loadConfig(data)
+	mergeConfig := options.NewMergeConfiguration(data, instanceData)
+	patchedConfig, existentFields, err := mergeConfig.MergePatchSharedConfiguration(o.config)
+	if err != nil {
+		return nil, err
+	}
+
+	c, _ := o.loadConfig(patchedConfig)
+
+	// Instance does not contains the address from config, copying the shared into the instance.
+	if !stringInSlice("bindAddress", existentFields) {
+		o.instanceConfig.BindAddress = c.BindAddress
+	}
+
+	return c, nil
 }
 
 // loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
