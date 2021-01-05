@@ -39,6 +39,27 @@ func GetDenyIngress(name string) *networkingv1.NetworkPolicy {
 	}
 }
 
+// GetDenyIngressEmptyPeerSelector returns a default ingress deny policy using empty Peer selector.
+func GetDenyIngressEmptyPeerSelector(name string) *networkingv1.NetworkPolicy {
+	return &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			Ingress:     []networkingv1.NetworkPolicyIngressRule{
+				{
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{}}
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 // GetRandomIngressPolicies returns "num" random policies that allow a unique:n label, i.e.
 // unique:1, unique:2, and so on.  Used for creating a 'background' set of policies.
 func GetRandomIngressPolicies(num int) []*networkingv1.NetworkPolicy {
