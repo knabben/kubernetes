@@ -114,7 +114,56 @@ func SIGDescribeCopy(text string, body func()) bool {
 }
 
 var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
+	scenarios := LoadYAMLTests()
 	f := framework.NewDefaultFramework("netpol")
+
+	ginkgo.Context("NetworkPolicy loaded from tests", func() {
+		ginkgo.BeforeEach(func() {
+			if useFixedNamespaces {
+				_ = initializeResources(f)
+
+				_, _, _, model, k8s := getK8SModel(f)
+				framework.ExpectNoError(k8s.cleanNetworkPolicies(model.NamespaceNames), "unable to clean network policies")
+				err := wait.Poll(waitInterval, waitTimeout, func() (done bool, err error) {
+					for _, ns := range model.NamespaceNames {
+						netpols, err := k8s.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
+						framework.ExpectNoError(err, "get network policies from ns %s", ns)
+						if len(netpols.Items) > 0 {
+							return false, nil
+						}
+					}
+					return true, nil
+				})
+				framework.ExpectNoError(err, "unable to wait for network policy deletion")
+			} else {
+				framework.Logf("Using %v as the default dns domain for this cluster... ", framework.TestContext.ClusterDNSDomain)
+				framework.ExpectNoError(initializeResources(f), "unable to initialize resources")
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			if !useFixedNamespaces {
+				_, _, _, model, k8s := getK8SModel(f)
+				framework.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up netpol namespaces")
+			}
+		})
+
+		for _, testData := range scenarios.Content {
+			ginkgo.It(testData.Title, func() {
+				nsX, _, _, model, k8s := getK8SModel(f)
+
+				for _, policy := range testData.Netpols {
+					framework.Logf("%v+", policy)
+					// these tests only creates Policy on nsX by default
+					CreatePolicy(k8s, &policy, nsX)
+				}
+
+				reachability := NewReachability(model.AllPods(), true)
+				reachability.Expected = BuildTruthTable(testData)
+				ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+			})
+		}
+	})
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
 		ginkgo.BeforeEach(func() {
@@ -977,7 +1026,7 @@ func defaultModel(namespaces []string, dnsDomain string) *Model {
 	if addSCTPContainers {
 		protocols = append(protocols, v1.ProtocolSCTP)
 	}
-	return NewModel(namespaces, []string{"a", "b", "c"}, []int32{80, 81}, protocols, dnsDomain)
+	return NewModel(namespaces, []string{"a", "b"}, []int32{80, 81}, protocols, dnsDomain)
 }
 
 // getK8sModel generates a network policy model using the framework's root namespace and cluster DNS domain.

@@ -25,7 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"sigs.k8s.io/yaml"
+	//"sigs.k8s.io/yaml"
+	"encoding/json"
 )
 
 const (
@@ -35,7 +36,7 @@ const (
 
 // prettyPrint a networkPolicy
 func prettyPrint(policy *networkingv1.NetworkPolicy) string {
-	raw, err := yaml.Marshal(policy)
+	raw, err := json.Marshal(policy)
 	framework.ExpectNoError(err, "marshal network policy to yaml")
 	return string(raw)
 }

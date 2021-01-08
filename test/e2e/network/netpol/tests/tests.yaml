@@ -1,0 +1,49 @@
+scenarios:
+  - title: "between server and client should support a 'default-deny-ingress' policy"
+    netpols:
+      - metadata:
+          namespace: x
+          name: deny-ingress
+        spec:
+          podSelector: {}
+          policyTypes:
+            - Ingress
+    fromList: [ "x/a", "x/b", "z/a", "z/b" ]
+    toList: [ "x/a", "x/b", "z/a", "z/b" ]
+    matches:
+      - from: x/a
+        to: ["x/a", "x/b"]
+      - from: x/b
+        to: ["x/a", "x/b"]
+      - from: z/a
+        to: ["x/a", "x/b"]
+      - from: z/b
+        to: ["x/a", "x/b"]
+  - title: "should enforce policy based on PodSelector with MatchExpressions"
+    netpols:
+      - metadata:
+          namespace: x
+          name: x-a-allows-x-b
+        spec:
+          ingress:
+            - from:
+                - podSelector:
+                  matchExpressions:
+                    - key: pod
+                      operator: In
+                      values:
+                        - b
+          podSelector:
+            matchLabels:
+              pod: a
+    fromList: ["x/a", "x/b", "z/a", "z/b"]
+    toList: ["x/a", "x/b", "z/a", "z/b"]
+    matches:
+      - from: x/a
+        to: ["x/a", "x/b"]
+      - from: x/b
+        to: ["x/a", "x/b"]
+      - from: z/a
+        to: ["x/a", "x/b"]
+      - from: z/b
+        to: ["x/a", "x/b"]
