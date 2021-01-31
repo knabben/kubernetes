@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -55,6 +56,8 @@ func main(cmd *cobra.Command, args []string) {
 	switch protocol {
 	case "", "tcp":
 		connectTCP(dest, timeout)
+	case "udp":
+		connectUDP(dest, timeout)
 	case "sctp":
 		connectSCTP(dest, timeout)
 	default:
@@ -124,4 +127,46 @@ func connectSCTP(dest string, timeout time.Duration) {
 		fmt.Fprint(os.Stderr, "TIMEOUT\n")
 		os.Exit(1)
 	}
+}
+
+func connectUDP(dest string, timeout time.Duration) {
+	if _, err := net.ResolveUDPAddr("udp", dest); err != nil {
+		fmt.Fprintf(os.Stderr, "DNS: %v\n", err)
+		os.Exit(1)
+	}
+
+	conn, err := net.Dial("udp", dest)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "OTHER: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err = conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		fmt.Fprintf(os.Stderr, "OTHER: %v\n", err)
+		os.Exit(1)
+	}
+
+	if _, err = conn.Write([]byte("hostname\n")); err != nil {
+		parseUDPErrorAndExit(err)
+		os.Exit(1)
+	}
+
+	var buf = make([]byte, 1024)
+	if _, err = conn.Read(buf); err != nil {
+		parseUDPErrorAndExit(err)
+	}
+}
+
+func parseUDPErrorAndExit(err error) {
+	neterr, ok := err.(net.Error)
+
+	if ok && neterr.Timeout() {
+		fmt.Fprintf(os.Stderr, "TIMEOUT: %v\n", err)
+	} else if strings.Contains(err.Error(), "connection refused") {
+		fmt.Fprintf(os.Stderr, "REFUSED: %v\n", err)
+	} else {
+		fmt.Fprintf(os.Stderr, "UNKNOWN: %v", err)
+	}
+
+	os.Exit(1)
 }
