@@ -121,9 +121,9 @@ func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, container
 	var cmd []string
 	switch protocol {
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=sctp"}
+		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=3s", "--protocol=sctp"}
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=3s", "--protocol=tcp"}
 	case v1.ProtocolUDP:
 		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=udp"}
 		// just a hack
@@ -283,7 +283,7 @@ func (k *kubeManager) waitForHTTPServers(model *Model, protocols []v1.Protocol) 
 		notReady[caseName] = true
 	}
 
-	for i := 0; i < maxTries ; i++ {
+	for i := 0; i < maxTries; i++ {
 		for caseName, testCase := range testCases {
 			if notReady[caseName] {
 				reachability := NewReachability(model.AllPods(), true)
