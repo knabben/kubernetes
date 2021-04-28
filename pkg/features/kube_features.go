@@ -280,14 +280,6 @@ const (
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
 	NodeLease featuregate.Feature = "NodeLease"
 
-	// owner: @janosi
-	// alpha: v1.12
-	// beta:  v1.19
-	// GA:    v1.20
-	//
-	// Enables SCTP as new protocol for Service ports, NetworkPolicy, and ContainerPort in Pod/Containers definition
-	SCTPSupport featuregate.Feature = "SCTPSupport"
-
 	// owner: @rikatz
 	// alpha: v1.21
 	//
@@ -565,13 +557,6 @@ const (
 	// Enables usage of hugepages-<size> in downward API.
 	DownwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
 
-	// owner: @freehan
-	// GA: v1.18
-	//
-	// Enable ExternalTrafficPolicy for Service ExternalIPs.
-	// This is for bug fix #69811
-	ExternalPolicyForExternalIP featuregate.Feature = "ExternalPolicyForExternalIP"
-
 	// owner: @bswartz
 	// alpha: v1.18
 	//
@@ -748,6 +733,7 @@ const (
 
 	// owner: @jayunit100 @abhiraut @rikatz
 	// beta: v1.21
+	// ga: v1.22
 	//
 	// Labels all namespaces with a default label "kubernetes.io/metadata.name: <namespaceName>"
 	NamespaceDefaultLabelName featuregate.Feature = "NamespaceDefaultLabelName"
@@ -815,7 +801,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	SCTPSupport:                                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	NetworkPolicyEndPort:                           {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSnapshotDataSource:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
@@ -840,8 +825,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
-	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta},                   // on by default in 1.22
-	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta}, // on by default in 1.22
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: true, PreRelease: featuregate.Beta},
 	SetHostnameAsFQDN:                              {Default: true, PreRelease: featuregate.Beta},
@@ -869,7 +853,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceInternalTrafficPolicy:                   {Default: false, PreRelease: featuregate.Alpha},
 	SuspendJob:                                     {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
-	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.Beta}, // graduate to GA and lock to default in 1.22, remove in 1.24
+	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
@@ -880,7 +864,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.APIPriorityAndFairness:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
 

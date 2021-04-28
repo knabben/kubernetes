@@ -160,17 +160,8 @@ cluster's shared state through which all other components interact.`,
 		fs.AddFlagSet(f)
 	}
 
-	usageFmt := "Usage:\n  %s\n"
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
-		return nil
-	})
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
-	})
+	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
 
 	return cmd
 }
@@ -678,18 +669,17 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		}
 	}
 
-	if s.APIEnablement.RuntimeConfig != nil {
-		for key, value := range s.APIEnablement.RuntimeConfig {
-			if key == "v1" || strings.HasPrefix(key, "v1/") ||
-				key == "api/v1" || strings.HasPrefix(key, "api/v1/") {
-				delete(s.APIEnablement.RuntimeConfig, key)
-				s.APIEnablement.RuntimeConfig["/v1"] = value
-			}
-			if key == "api/legacy" {
-				delete(s.APIEnablement.RuntimeConfig, key)
-			}
+	for key, value := range s.APIEnablement.RuntimeConfig {
+		if key == "v1" || strings.HasPrefix(key, "v1/") ||
+			key == "api/v1" || strings.HasPrefix(key, "api/v1/") {
+			delete(s.APIEnablement.RuntimeConfig, key)
+			s.APIEnablement.RuntimeConfig["/v1"] = value
+		}
+		if key == "api/legacy" {
+			delete(s.APIEnablement.RuntimeConfig, key)
 		}
 	}
+
 	options.ServerRunOptions = s
 	return options, nil
 }
@@ -733,16 +723,14 @@ func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, ne
 		return apiServerServiceIP, primaryServiceIPRange, net.IPNet{}, nil
 	}
 
-	if len(serviceClusterIPRangeList) > 0 {
-		_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
-		if err != nil {
-			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
-		}
+	_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
+	if err != nil {
+		return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
+	}
 
-		primaryServiceIPRange, apiServerServiceIP, err = controlplane.ServiceIPRange(*(primaryServiceClusterCIDR))
-		if err != nil {
-			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
-		}
+	primaryServiceIPRange, apiServerServiceIP, err = controlplane.ServiceIPRange(*(primaryServiceClusterCIDR))
+	if err != nil {
+		return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
 	}
 
 	// user provided at least two entries
