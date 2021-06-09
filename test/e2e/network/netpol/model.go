@@ -46,13 +46,9 @@ func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsD
 	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP}, dnsDomain)
 }
 
-// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
+// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check.
 func (m *Model) GetProbeTimeoutSeconds() int {
-	timeoutSeconds := 1
-	if framework.NodeOSDistroIs("windows") {
-		timeoutSeconds = 3
-	}
-	return timeoutSeconds
+	return 3
 }
 
 // GetWorkers returns the number of workers suggested to run when testing, taking windows heuristics into account, where parallel probing is flakier.
