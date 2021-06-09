@@ -9,7 +9,7 @@
     "uid": "7",
     "resourceVersion": "11042405498087606203",
     "generation": 8071137005907523419,
-    "creationTimestamp": null,
+    "creationTimestamp": "2061-09-19T18:13:36Z",
     "deletionGracePeriodSeconds": -4955867275792137171,
     "labels": {
       "7": "8"
@@ -77,28 +77,25 @@
         "timeoutSeconds": 2072604405
       }
     },
-    "topologyKeys": [
-      "31"
-    ],
     "ipFamilies": [
-      "斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ"
+      "x"
     ],
-    "ipFamilyPolicy": "9ȫŚ",
+    "ipFamilyPolicy": "%a鯿rŎǀ朲^苣f",
     "allocateLoadBalancerNodePorts": true,
-    "loadBalancerClass": "32",
-    "internalTrafficPolicy": ""
+    "loadBalancerClass": "31",
+    "internalTrafficPolicy": "hDrȮO励鹗"
   },
   "status": {
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "33",
-          "hostname": "34",
+          "ip": "32",
+          "hostname": "33",
           "ports": [
             {
-              "port": 684408190,
-              "protocol": "ƈ斎AO6ĴC浔Ű",
-              "error": "35"
+              "port": 165528693,
+              "protocol": "UɦOŖ",
+              "error": "34"
             }
           ]
         }
@@ -106,12 +103,12 @@
     },
     "conditions": [
       {
-        "type": "36",
-        "status": "ž(-譵",
-        "observedGeneration": -8651056334266075769,
-        "lastTransitionTime": "2404-01-10T11:35:42Z",
-        "reason": "37",
-        "message": "38"
+        "type": "35",
+        "status": "尷ȸd賑",
+        "observedGeneration": 3519145202439908029,
+        "lastTransitionTime": "2256-09-10T15:38:25Z",
+        "reason": "36",
+        "message": "37"
       }
     ]
   }

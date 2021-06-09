@@ -41,7 +41,7 @@ import (
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
+	configv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -133,7 +133,7 @@ func splitHostIntPort(s string) (string, int, error) {
 }
 
 func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	versionedCfg := kubeschedulerconfigv1beta1.KubeSchedulerConfiguration{}
+	versionedCfg := configv1beta2.KubeSchedulerConfiguration{}
 	versionedCfg.DebuggingConfiguration = *configv1alpha1.NewRecommendedDebuggingConfiguration()
 
 	kubeschedulerscheme.Scheme.Default(&versionedCfg)
@@ -141,6 +141,11 @@ func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguratio
 	if err := kubeschedulerscheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
 		return nil, err
 	}
+	// We don't set this field in pkg/scheduler/apis/config/{version}/conversion.go
+	// because the field will be cleared later by API machinery during
+	// conversion. See KubeSchedulerConfiguration internal type definition for
+	// more details.
+	cfg.TypeMeta.APIVersion = configv1beta2.SchemeGroupVersion.String()
 	return &cfg, nil
 }
 
@@ -148,7 +153,6 @@ func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguratio
 func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	fs := nfs.FlagSet("misc")
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, `The path to the configuration file. The following flags can overwrite fields in this file:
-  --algorithm-provider
   --policy-config-file
   --policy-configmap
   --policy-configmap-namespace`)

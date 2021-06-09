@@ -87,19 +87,19 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 	}, true, nil
 }
 
-// MasterReceiver can be used to provide the master to a custom incoming server function
-type MasterReceiver interface {
-	SetMaster(m *controlplane.Instance)
+// APIServerReceiver can be used to provide the API server to a custom incoming server function
+type APIServerReceiver interface {
+	SetAPIServer(m *controlplane.Instance)
 }
 
-// MasterHolder implements
-type MasterHolder struct {
+// APIServerHolder implements
+type APIServerHolder struct {
 	Initialized chan struct{}
 	M           *controlplane.Instance
 }
 
-// SetMaster assigns the current master.
-func (h *MasterHolder) SetMaster(m *controlplane.Instance) {
+// SetAPIServer assigns the current API server.
+func (h *APIServerHolder) SetAPIServer(m *controlplane.Instance) {
 	h.M = m
 	close(h.Initialized)
 }
@@ -123,8 +123,8 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
-// startApiserverOrDie starts a kubernetes master and an httpserver to handle api requests
-func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+// startAPIServerOrDie starts a kubernetes master and an httpserver to handle api requests
+func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
 
@@ -153,7 +153,7 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	}
 
 	if controlPlaneConfig == nil {
-		controlPlaneConfig = NewMasterConfig()
+		controlPlaneConfig = NewControlPlaneConfig()
 		controlPlaneConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
 	}
 
@@ -214,8 +214,8 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		closeFn()
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
-	if masterReceiver != nil {
-		masterReceiver.SetMaster(m)
+	if apiServerReceiver != nil {
+		apiServerReceiver.SetAPIServer(m)
 	}
 
 	// TODO have this start method actually use the normal start sequence for the API server
@@ -251,22 +251,22 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	return m, s, closeFn
 }
 
-// NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
-func NewIntegrationTestMasterConfig() *controlplane.Config {
-	return NewIntegrationTestMasterConfigWithOptions(&MasterConfigOptions{})
+// NewIntegrationTestControlPlaneConfig returns the master config appropriate for most integration tests.
+func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
+	return NewIntegrationTestControlPlaneConfigWithOptions(&MasterConfigOptions{})
 }
 
-// NewIntegrationTestMasterConfigWithOptions returns the master config appropriate for most integration tests
+// NewIntegrationTestControlPlaneConfigWithOptions returns the control plane config appropriate for most integration tests
 // configured with the provided options.
-func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
-	masterConfig := NewMasterConfigWithOptions(opts)
-	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
+func NewIntegrationTestControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
+	controlPlaneConfig := NewControlPlaneConfigWithOptions(opts)
+	controlPlaneConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
 
 	// TODO: get rid of these tests or port them to secure serving
-	masterConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
+	controlPlaneConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
-	return masterConfig
+	return controlPlaneConfig
 }
 
 // MasterConfigOptions are the configurable options for a new integration test master config.
@@ -284,13 +284,13 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 	return etcdOptions
 }
 
-// NewMasterConfig returns a basic master config.
-func NewMasterConfig() *controlplane.Config {
-	return NewMasterConfigWithOptions(&MasterConfigOptions{})
+// NewControlPlaneConfig returns a basic control plane config.
+func NewControlPlaneConfig() *controlplane.Config {
+	return NewControlPlaneConfigWithOptions(&MasterConfigOptions{})
 }
 
-// NewMasterConfigWithOptions returns a basic master config configured with the provided options.
-func NewMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
+// NewControlPlaneConfigWithOptions returns a basic control plane config configured with the provided options.
+func NewControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
 	etcdOptions := DefaultEtcdOptions()
 	if opts.EtcdOptions != nil {
 		etcdOptions = opts.EtcdOptions
@@ -309,6 +309,12 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config 
 
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
+	if len(kubeVersion.Major) == 0 {
+		kubeVersion.Major = "1"
+	}
+	if len(kubeVersion.Minor) == 0 {
+		kubeVersion.Minor = "22"
+	}
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 
@@ -335,18 +341,18 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config 
 // CloseFunc can be called to cleanup the master
 type CloseFunc func()
 
-// RunAMaster starts a master with the provided config.
-func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
-	if masterConfig == nil {
-		masterConfig = NewMasterConfig()
-		masterConfig.GenericConfig.EnableProfiling = true
+// RunAnAPIServer starts a API server with the provided config.
+func RunAnAPIServer(controlPlaneConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	if controlPlaneConfig == nil {
+		controlPlaneConfig = NewControlPlaneConfig()
+		controlPlaneConfig.GenericConfig.EnableProfiling = true
 	}
-	return startApiserverOrDie(masterConfig, nil, nil)
+	return startAPIServerOrDie(controlPlaneConfig, nil, nil)
 }
 
-// RunAnApiserverUsingServer starts up an instance using the provided config on the specified server.
-func RunAnApiserverUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
-	return startApiserverOrDie(controlPlaneConfig, s, masterReceiver)
+// RunAnAPIServerUsingServer starts up an instance using the provided config on the specified server.
+func RunAnAPIServerUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	return startAPIServerOrDie(controlPlaneConfig, s, apiServerReceiver)
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.

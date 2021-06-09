@@ -29,7 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -91,6 +94,7 @@ type Scheduler struct {
 }
 
 type schedulerOptions struct {
+	componentConfigVersion   string
 	kubeConfig               *restclient.Config
 	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
 	percentageOfNodesToScore int32
@@ -106,6 +110,16 @@ type schedulerOptions struct {
 
 // Option configures a Scheduler
 type Option func(*schedulerOptions)
+
+// WithComponentConfigVersion sets the component config version to the
+// KubeSchedulerConfiguration version used. The string should be the full
+// scheme group/version of the external type we converted from (for example
+// "kubescheduler.config.k8s.io/v1beta2")
+func WithComponentConfigVersion(apiVersion string) Option {
+	return func(o *schedulerOptions) {
+		o.componentConfigVersion = apiVersion
+	}
+}
 
 // WithKubeConfig sets the kube config for Scheduler.
 func WithKubeConfig(cfg *restclient.Config) Option {
@@ -221,8 +235,10 @@ func New(client clientset.Interface,
 	}
 
 	snapshot := internalcache.NewEmptySnapshot()
+	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
 	configurator := &Configurator{
+		componentConfigVersion:   options.componentConfigVersion,
 		client:                   client,
 		kubeConfig:               options.kubeConfig,
 		recorderFactory:          recorderFactory,
@@ -238,6 +254,7 @@ func New(client clientset.Interface,
 		extenders:                options.extenders,
 		frameworkCapturer:        options.frameworkCapturer,
 		parallellism:             options.parallelism,
+		clusterEventMap:          clusterEventMap,
 	}
 
 	metrics.Register()
@@ -281,8 +298,28 @@ func New(client clientset.Interface,
 	sched.StopEverything = stopEverything
 	sched.client = client
 
-	addAllEventHandlers(sched, informerFactory)
+	// Build dynamic client and dynamic informer factory
+	var dynInformerFactory dynamicinformer.DynamicSharedInformerFactory
+	// options.kubeConfig can be nil in tests.
+	if options.kubeConfig != nil {
+		dynClient := dynamic.NewForConfigOrDie(options.kubeConfig)
+		dynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
+	}
+
+	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
 	return sched, nil
+}
+
+func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
+	gvkMap := make(map[framework.GVK]framework.ActionType)
+	for evt := range m {
+		if _, ok := gvkMap[evt.Resource]; ok {
+			gvkMap[evt.Resource] |= evt.ActionType
+		} else {
+			gvkMap[evt.Resource] = evt.ActionType
+		}
+	}
+	return gvkMap
 }
 
 // initPolicyFromFile initialize policy from file

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -1445,19 +1444,19 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 		},
 		{
 			name:                            "UpdateFeatureDisabled",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "100"}},
 			featureEnabled:                  false,
 			wantAllowInvalidPodDeletionCost: true,
 		},
 		{
 			name:                            "UpdateFeatureEnabledValidOldValue",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "100"}},
 			featureEnabled:                  true,
 			wantAllowInvalidPodDeletionCost: false,
 		},
 		{
 			name:                            "UpdateFeatureEnabledValidOldValue",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "invalid-value"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "invalid-value"}},
 			featureEnabled:                  true,
 			wantAllowInvalidPodDeletionCost: true,
 		},
@@ -1470,6 +1469,365 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, nil, nil, tc.oldPodMeta)
 			if tc.wantAllowInvalidPodDeletionCost != gotOptions.AllowInvalidPodDeletionCost {
 				t.Errorf("unexpected diff, want: %v, got: %v", tc.wantAllowInvalidPodDeletionCost, gotOptions.AllowInvalidPodDeletionCost)
+			}
+		})
+	}
+}
+
+func TestHaveSameExpandedDNSConfig(t *testing.T) {
+	testCases := []struct {
+		desc       string
+		podSpec    *api.PodSpec
+		oldPodSpec *api.PodSpec
+		want       bool
+	}{
+		{
+			desc:       "nil DNSConfig",
+			podSpec:    &api.PodSpec{},
+			oldPodSpec: &api.PodSpec{},
+			want:       false,
+		},
+		{
+			desc: "empty DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{},
+			},
+			want: false,
+		},
+		{
+			desc: "same legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"baz.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "same expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			desc: "update expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"baz.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update to legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"baz.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update to expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"baz.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := haveSameExpandedDNSConfig(tc.podSpec, tc.oldPodSpec)
+			if tc.want != got {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, got)
 			}
 		})
 	}
