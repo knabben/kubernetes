@@ -1586,7 +1586,6 @@ func (proxier *Proxier) syncProxyRules() {
 			nodePortSet.activeEntries.Insert(entry.String())
 		}
 	}
-
 	// sync ipset entries
 	for _, set := range proxier.ipsetList {
 		set.syncIPSetEntries()

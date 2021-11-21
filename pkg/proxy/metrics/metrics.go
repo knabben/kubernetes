@@ -21,10 +21,11 @@ import (
 	"time"
 
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const kubeProxySubsystem = "kubeproxy"
+
+var registerMetricsOnce sync.Once
 
 var (
 	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
@@ -149,24 +150,6 @@ var (
 		},
 	)
 )
-
-var registerMetricsOnce sync.Once
-
-// RegisterMetrics registers kube-proxy metrics.
-func RegisterMetrics() {
-	registerMetricsOnce.Do(func() {
-		legacyregistry.MustRegister(SyncProxyRulesLatency)
-		legacyregistry.MustRegister(SyncProxyRulesLastTimestamp)
-		legacyregistry.MustRegister(NetworkProgrammingLatency)
-		legacyregistry.MustRegister(EndpointChangesPending)
-		legacyregistry.MustRegister(EndpointChangesTotal)
-		legacyregistry.MustRegister(ServiceChangesPending)
-		legacyregistry.MustRegister(ServiceChangesTotal)
-		legacyregistry.MustRegister(IptablesRulesTotal)
-		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
-		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
-	})
-}
 
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
